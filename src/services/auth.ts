@@ -6,7 +6,8 @@ import {
   User,
   signInWithEmailAndPassword,
   fetchSignInMethodsForEmail,
-  linkWithCredential
+  linkWithCredential,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { getFirestore, doc, getDoc, collection, query, where, getDocs, setDoc, Firestore, deleteDoc } from 'firebase/firestore';
@@ -182,6 +183,15 @@ export class AuthService {
       await signOut(auth);
     } catch (error) {
       console.error('Error signing out:', error);
+    }
+  }
+
+  async sendPasswordReset(email: string): Promise<void> {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (error) {
+      console.error('Error sending password reset email:', error);
+      throw error;
     }
   }
 
