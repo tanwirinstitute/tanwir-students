@@ -46,7 +46,9 @@ export interface Course {
   syllabus?: string;
   subjects?: string[];  // Array of subjects for the course
   attachments?: CourseAttachment[]; // Array of course attachments
-  playlist?: string; // YouTube playlist ID
+  playlist?: string; // YouTube playlist ID (legacy - for courses with single playlist)
+  fallPlaylist?: string; // Fall semester YouTube playlist ID
+  springPlaylist?: string; // Spring semester YouTube playlist ID
   // Add these for compatibility with existing code
   Name?: string;      // Alias for name
   Description?: string; // Alias for description
@@ -58,6 +60,8 @@ export interface Course {
   Subjects?: string[];  // Uppercase alias for subjects
   Attachments?: CourseAttachment[]; // Uppercase alias for attachments
   Playlist?: string;    // Uppercase alias for playlist
+  FallPlaylist?: string; // Uppercase alias for fallPlaylist
+  SpringPlaylist?: string; // Uppercase alias for springPlaylist
   Enrollments?: any[];  // Keep for compatibility
   Level?: number;       // Keep for compatibility
 }

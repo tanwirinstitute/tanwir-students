@@ -104,6 +104,16 @@ export const CourseDetail: React.FC = () => {
       const fetchedCourse = await courseService.getCourseById(courseId);
       setCourse(fetchedCourse ?? null);
       
+      console.log('CourseDetail - Course data:', {
+        courseId,
+        playlist: fetchedCourse?.playlist,
+        Playlist: fetchedCourse?.Playlist,
+        fallPlaylist: fetchedCourse?.fallPlaylist,
+        FallPlaylist: fetchedCourse?.FallPlaylist,
+        springPlaylist: fetchedCourse?.springPlaylist,
+        SpringPlaylist: fetchedCourse?.SpringPlaylist
+      });
+      
       // Get user role
       const role = await authService.getUserRole();
       setUserRole(role);
@@ -823,7 +833,9 @@ export const CourseDetail: React.FC = () => {
         <div className="course-videos">
           <h3>Course Videos</h3>
           <Videos 
-            playlistId={course?.playlist} 
+            playlistId={course?.playlist || course?.Playlist}
+            fallPlaylistId={course?.fallPlaylist || course?.FallPlaylist}
+            springPlaylistId={course?.springPlaylist || course?.SpringPlaylist}
             enrolledSemesters={userRole === 'admin' ? undefined : enrolledSemesters}
           />
         </div>

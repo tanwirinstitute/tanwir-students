@@ -4,28 +4,61 @@ import { VideoPlayer } from './VideoPlayer';
 import { YouTubeService } from '../../services/youtube/youtubeService';
 
 interface VideosProps {
-  playlistId?: string;
+  playlistId?: string; // Legacy: single playlist for all videos
+  fallPlaylistId?: string; // New: separate fall semester playlist
+  springPlaylistId?: string; // New: separate spring semester playlist
   enrolledSemesters?: string[]; // 'fall', 'spring', or both
 }
 
 type SemesterTab = 'fall' | 'spring' | 'all';
 
-export const Videos: React.FC<VideosProps> = ({ playlistId, enrolledSemesters }) => {
+export const Videos: React.FC<VideosProps> = ({ playlistId, fallPlaylistId, springPlaylistId, enrolledSemesters }) => {
   const [videoList, setVideoList] = useState<Video[]>([]);
+  const [fallVideos, setFallVideos] = useState<Video[]>([]);
+  const [springVideos, setSpringVideos] = useState<Video[]>([]);
   const [selectedVideoIndex, setSelectedVideoIndex] = useState<number>(0);
   const [viewMode, setViewMode] = useState<'list' | 'player'>('list');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<SemesterTab>('spring');
+  const useDualPlaylists = !!(fallPlaylistId || springPlaylistId);
 
   useEffect(() => {
     const fetchPlaylistVideos = async () => {
-      if (playlistId) {
-        setLoading(true);
-        setError(null);
+      setLoading(true);
+      setError(null);
+      
+      console.log('Videos component - Playlist IDs:', {
+        playlistId,
+        fallPlaylistId,
+        springPlaylistId,
+        useDualPlaylists
+      });
+      
+      try {
+        const youtubeService = YouTubeService.getInstance();
         
-        try {
-          const youtubeService = YouTubeService.getInstance();
+        if (useDualPlaylists) {
+          // Fetch from separate fall and spring playlists
+          console.log('Fetching dual playlists...');
+          const [fetchedFallVideos, fetchedSpringVideos] = await Promise.all([
+            fallPlaylistId ? youtubeService.getPlaylistVideos(fallPlaylistId) : Promise.resolve([]),
+            springPlaylistId ? youtubeService.getPlaylistVideos(springPlaylistId) : Promise.resolve([])
+          ]);
+          
+          console.log('Fetched videos:', {
+            fallCount: fetchedFallVideos.length,
+            springCount: fetchedSpringVideos.length
+          });
+          
+          setFallVideos(fetchedFallVideos);
+          setSpringVideos(fetchedSpringVideos);
+          
+          if (fetchedFallVideos.length === 0 && fetchedSpringVideos.length === 0) {
+            setError('No videos found in playlists.');
+          }
+        } else if (playlistId) {
+          // Legacy: fetch from single playlist
           const fetchedVideos = await youtubeService.getPlaylistVideos(playlistId);
           
           if (fetchedVideos.length > 0) {
@@ -33,17 +66,17 @@ export const Videos: React.FC<VideosProps> = ({ playlistId, enrolledSemesters })
           } else {
             setError('No videos found in this playlist.');
           }
-        } catch (err) {
-          console.error('Error fetching playlist:', err);
-          setError('Failed to load videos. Please try again later.');
-        } finally {
-          setLoading(false);
         }
+      } catch (err) {
+        console.error('Error fetching playlist:', err);
+        setError('Failed to load videos. Please try again later.');
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchPlaylistVideos();
-  }, [playlistId]);
+  }, [playlistId, fallPlaylistId, springPlaylistId, useDualPlaylists]);
 
   // Helper function to determine semester based on month
   const getSemester = (date: Date): 'fall' | 'spring' | 'other' => {
@@ -84,55 +117,65 @@ export const Videos: React.FC<VideosProps> = ({ playlistId, enrolledSemesters })
     }
   }, [visibleTabs, activeTab]);
 
+  // Sort: class videos first (by class number descending), then non-class videos
+  const sortVideos = (a: Video, b: Video) => {
+    const aIsClass = a.title.toLowerCase().includes('class');
+    const bIsClass = b.title.toLowerCase().includes('class');
+    
+    // If one is class and other isn't, class comes first
+    if (aIsClass && !bIsClass) return -1;
+    if (!aIsClass && bIsClass) return 1;
+    
+    // Both are class videos - sort by class number (descending)
+    if (aIsClass && bIsClass) {
+      const aMatch = a.title.match(/class\s+(\d+)/i);
+      const bMatch = b.title.match(/class\s+(\d+)/i);
+      const aNum = aMatch ? parseInt(aMatch[1]) : 0;
+      const bNum = bMatch ? parseInt(bMatch[1]) : 0;
+      return bNum - aNum; // Descending order
+    }
+    
+    // Both non-class videos - sort by date (newest first)
+    const dateA = new Date(a.uploadDate || 0);
+    const dateB = new Date(b.uploadDate || 0);
+    return dateB.getTime() - dateA.getTime();
+  };
+
   // Organize videos by semester
   const organizedVideos = useMemo(() => {
-    const fall: Video[] = [];
-    const spring: Video[] = [];
+    if (useDualPlaylists) {
+      // Use separate playlists for fall and spring
+      return {
+        fall: [...fallVideos].sort(sortVideos),
+        spring: [...springVideos].sort(sortVideos),
+        all: [...fallVideos, ...springVideos].sort(sortVideos)
+      };
+    } else {
+      // Legacy: categorize by upload date
+      const fall: Video[] = [];
+      const spring: Video[] = [];
 
-    videoList.forEach(video => {
-      if (video.uploadDate) {
-        const uploadDate = new Date(video.uploadDate);
+      videoList.forEach(video => {
+        if (video.uploadDate) {
+          const uploadDate = new Date(video.uploadDate);
 
-        // Categorize by semester
-        const semester = getSemester(uploadDate);
-        if (semester === 'fall') {
-          fall.push(video);
-        } else if (semester === 'spring') {
-          spring.push(video);
+          // Categorize by semester
+          const semester = getSemester(uploadDate);
+          if (semester === 'fall') {
+            fall.push(video);
+          } else if (semester === 'spring') {
+            spring.push(video);
+          }
         }
-      }
-    });
+      });
 
-// Sort: class videos first (by class number descending), then non-class videos
-const sortVideos = (a: Video, b: Video) => {
-  const aIsClass = a.title.toLowerCase().includes('class');
-  const bIsClass = b.title.toLowerCase().includes('class');
-  
-  // If one is class and other isn't, class comes first
-  if (aIsClass && !bIsClass) return -1;
-  if (!aIsClass && bIsClass) return 1;
-  
-  // Both are class videos - sort by class number (descending)
-  if (aIsClass && bIsClass) {
-    const aMatch = a.title.match(/class\s+(\d+)/i);
-    const bMatch = b.title.match(/class\s+(\d+)/i);
-    const aNum = aMatch ? parseInt(aMatch[1]) : 0;
-    const bNum = bMatch ? parseInt(bMatch[1]) : 0;
-    return bNum - aNum; // Descending order
-  }
-  
-  // Both non-class videos - sort by date (newest first)
-  const dateA = new Date(a.uploadDate || 0);
-  const dateB = new Date(b.uploadDate || 0);
-  return dateB.getTime() - dateA.getTime();
-};
-
-return {
-  fall: fall.sort(sortVideos),
-  spring: spring.sort(sortVideos),
-  all: [...videoList].sort(sortVideos)
-};
-  }, [videoList]);
+      return {
+        fall: fall.sort(sortVideos),
+        spring: spring.sort(sortVideos),
+        all: [...videoList].sort(sortVideos)
+      };
+    }
+  }, [videoList, fallVideos, springVideos, useDualPlaylists]);
 
   // Get current videos based on active tab
   const currentVideos = organizedVideos[activeTab];
@@ -156,7 +199,13 @@ return {
   }
 
   // If no videos available, show a message
-  if (!videoList || videoList.length === 0) {
+  if (useDualPlaylists) {
+    if (fallVideos.length === 0 && springVideos.length === 0) {
+      return (
+        <p className="empty">No videos available for this course.</p>
+      );
+    }
+  } else if (!videoList || videoList.length === 0) {
     return (
       <p className="empty">No videos available for this course.</p>
     );
@@ -218,7 +267,7 @@ return {
                 onClick={() => setActiveTab('all')}
               >
                 All
-                <span className="tab-count">{videoList.length}</span>
+                <span className="tab-count">{useDualPlaylists ? (fallVideos.length + springVideos.length) : videoList.length}</span>
               </button>
             )}
           </div>
