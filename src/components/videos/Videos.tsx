@@ -145,10 +145,29 @@ export const Videos: React.FC<VideosProps> = ({ playlistId, fallPlaylistId, spri
   const organizedVideos = useMemo(() => {
     if (useDualPlaylists) {
       // Use separate playlists for fall and spring
+      const fallSorted = [...fallVideos].sort(sortVideos);
+      const springSorted = [...springVideos].sort(sortVideos);
+      
+      // Filter 'all' based on enrollment
+      let allVideos: Video[] = [];
+      if (!enrolledSemesters || enrolledSemesters.length === 0) {
+        // Admin or no enrollment data - show all videos
+        allVideos = [...fallVideos, ...springVideos].sort(sortVideos);
+      } else {
+        // Student - only show videos from enrolled semesters
+        if (enrolledSemesters.includes('fall')) {
+          allVideos = [...allVideos, ...fallVideos];
+        }
+        if (enrolledSemesters.includes('spring')) {
+          allVideos = [...allVideos, ...springVideos];
+        }
+        allVideos = allVideos.sort(sortVideos);
+      }
+      
       return {
-        fall: [...fallVideos].sort(sortVideos),
-        spring: [...springVideos].sort(sortVideos),
-        all: [...fallVideos, ...springVideos].sort(sortVideos)
+        fall: fallSorted,
+        spring: springSorted,
+        all: allVideos
       };
     } else {
       // Legacy: categorize by upload date
@@ -169,13 +188,32 @@ export const Videos: React.FC<VideosProps> = ({ playlistId, fallPlaylistId, spri
         }
       });
 
+      const fallSorted = fall.sort(sortVideos);
+      const springSorted = spring.sort(sortVideos);
+      
+      // Filter 'all' based on enrollment
+      let allVideos: Video[] = [];
+      if (!enrolledSemesters || enrolledSemesters.length === 0) {
+        // Admin or no enrollment data - show all videos
+        allVideos = [...videoList].sort(sortVideos);
+      } else {
+        // Student - only show videos from enrolled semesters
+        if (enrolledSemesters.includes('fall')) {
+          allVideos = [...allVideos, ...fall];
+        }
+        if (enrolledSemesters.includes('spring')) {
+          allVideos = [...allVideos, ...spring];
+        }
+        allVideos = allVideos.sort(sortVideos);
+      }
+
       return {
-        fall: fall.sort(sortVideos),
-        spring: spring.sort(sortVideos),
-        all: [...videoList].sort(sortVideos)
+        fall: fallSorted,
+        spring: springSorted,
+        all: allVideos
       };
     }
-  }, [videoList, fallVideos, springVideos, useDualPlaylists]);
+  }, [videoList, fallVideos, springVideos, useDualPlaylists, enrolledSemesters]);
 
   // Get current videos based on active tab
   const currentVideos = organizedVideos[activeTab];
@@ -267,7 +305,7 @@ export const Videos: React.FC<VideosProps> = ({ playlistId, fallPlaylistId, spri
                 onClick={() => setActiveTab('all')}
               >
                 All
-                <span className="tab-count">{useDualPlaylists ? (fallVideos.length + springVideos.length) : videoList.length}</span>
+                <span className="tab-count">{organizedVideos.all.length}</span>
               </button>
             )}
           </div>

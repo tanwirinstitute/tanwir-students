@@ -82,12 +82,31 @@ export const CourseAttachments: React.FC<CourseAttachmentsProps> = ({ attachment
       return dateB.getTime() - dateA.getTime();
     };
 
+    const fallSorted = fall.sort(sortByDate);
+    const springSorted = spring.sort(sortByDate);
+    
+    // Filter 'all' based on enrollment
+    let allAttachments: CourseAttachment[] = [];
+    if (!enrolledSemesters || enrolledSemesters.length === 0) {
+      // Admin or no enrollment data - show all attachments
+      allAttachments = [...attachments].sort(sortByDate);
+    } else {
+      // Student - only show attachments from enrolled semesters
+      if (enrolledSemesters.includes('fall')) {
+        allAttachments = [...allAttachments, ...fall];
+      }
+      if (enrolledSemesters.includes('spring')) {
+        allAttachments = [...allAttachments, ...spring];
+      }
+      allAttachments = allAttachments.sort(sortByDate);
+    }
+
     return {
-      fall: fall.sort(sortByDate),
-      spring: spring.sort(sortByDate),
-      all: [...attachments].sort(sortByDate)
+      fall: fallSorted,
+      spring: springSorted,
+      all: allAttachments
     };
-  }, [attachments]);
+  }, [attachments, enrolledSemesters]);
 
   // Get current attachments based on active tab
   const currentAttachments = organizedAttachments[activeTab];
@@ -127,7 +146,7 @@ export const CourseAttachments: React.FC<CourseAttachmentsProps> = ({ attachment
             onClick={() => setActiveTab('all')}
           >
             All
-            <span className="tab-count">{attachments.length}</span>
+            <span className="tab-count">{organizedAttachments.all.length}</span>
           </button>
         )}
       </div>
