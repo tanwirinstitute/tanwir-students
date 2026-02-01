@@ -94,15 +94,31 @@ export const Courses: React.FC = () => {
     return enrolledCourseIds.includes(courseId);
   };
 
+  // Deduplicate courses by name and year (course plan) - show only one course even if multiple sections exist
+  const uniqueCourses = courses.reduce((acc: Course[], course) => {
+    const courseName = course.name || course.Name || '';
+    const courseYear = course.year || course.Year || '';
+    const existingCourse = acc.find(c => 
+      (c.name || c.Name || '') === courseName && 
+      (c.year || c.Year || '') === courseYear
+    );
+    
+    if (!existingCourse) {
+      acc.push(course);
+    }
+    
+    return acc;
+  }, []);
+
   return (
     <div className="courses-container">
       {loading ? (
         <div className="loading-container">
           <p>Loading courses...</p>
         </div>
-      ) : courses.length > 0 ? (
+      ) : uniqueCourses.length > 0 ? (
         <div className="courses-grid">
-          {courses.map((course) => (
+          {uniqueCourses.map((course) => (
             <CourseCard
               key={course.Id}
               courseId={course.Id}

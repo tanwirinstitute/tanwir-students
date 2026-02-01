@@ -3,7 +3,6 @@ import { usePage } from '../../context/PageContext';
 import { CourseService } from '../../services/courses/service/CourseService';
 import { Course } from '../../services/courses/types/course';
 import { AuthService, UserRole } from '../../services/auth';
-import { CourseEnrollment } from '../../services/auth/types';
 import { AssignmentService } from '../../services/assignments/service/AssignmentService';
 import { CourseAssignments } from '../assignments/CourseAssignments';
 import { EmailService } from '../../services/email/emailService';
@@ -126,21 +125,46 @@ export const CourseDetail: React.FC = () => {
         // Get user's enrollment data to determine which semesters they're enrolled in
         const userData = await authService.getUserData(currentUser.uid);
         if (userData?.courses) {
-          const enrollment: CourseEnrollment | undefined = userData.courses.find((c: any) => {
+          // Find ALL enrollments that match this course (there might be multiple with different semester plans)
+          const matchingEnrollments = userData.courses.filter((c: any) => {
             const courseRef = c.courseRef || '';
-            return courseRef.includes(courseId) || courseId.includes(courseRef.split('/')[1]);
+            const courseName = fetchedCourse?.name || fetchedCourse?.Name || '';
+            // Match by courseRef containing the courseId OR by course name in courseRef
+            return courseRef.includes(courseId) || 
+                   (courseName && courseRef.toLowerCase().includes(courseName.toLowerCase()));
           });
           
-          if (enrollment?.guidanceDetails?.plan) {
-            // Map plan values to semester tabs
-            const plan = enrollment.guidanceDetails.plan;
-            if (plan === 'Full Year') {
-              setEnrolledSemesters(['fall', 'spring']);
-            } else if (plan === 'Fall Semester') {
-              setEnrolledSemesters(['fall']);
-            } else if (plan === 'Spring Semester') {
-              setEnrolledSemesters(['spring']);
-            }
+          console.log('CourseDetail - Found matching enrollments:', matchingEnrollments.length, matchingEnrollments);
+          
+          if (matchingEnrollments.length > 0) {
+            const semestersSet = new Set<string>();
+            
+            // Collect semester plans from all matching enrollments
+            matchingEnrollments.forEach((enrollment: any) => {
+              // Check multiple possible locations for the plan field
+              const plan = enrollment.guidanceDetails?.plan || 
+                          enrollment.metadata?.plan || 
+                          enrollment.placementInfo?.plan ||
+                          enrollment.plan;
+              
+              console.log('CourseDetail - Enrollment plan:', plan, 'Enrollment:', enrollment);
+              
+              if (plan) {
+                // Map plan values to semester tabs
+                if (plan === 'Full Year') {
+                  semestersSet.add('fall');
+                  semestersSet.add('spring');
+                } else if (plan === 'Fall Semester') {
+                  semestersSet.add('fall');
+                } else if (plan === 'Spring Semester') {
+                  semestersSet.add('spring');
+                }
+              }
+            });
+            
+            const enrolledSemestersArray = Array.from(semestersSet);
+            console.log('CourseDetail - Final enrolled semesters:', enrolledSemestersArray);
+            setEnrolledSemesters(enrolledSemestersArray);
           }
         }
       }
