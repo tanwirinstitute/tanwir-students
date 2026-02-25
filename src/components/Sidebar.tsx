@@ -16,6 +16,7 @@ const routes: Route[] = [
   { path: '/courses', title: 'Courses', icon: 'school' },
   // { path: '/videos', title: 'Videos', icon: 'play_circle' },
   // { path: '/settings', title: 'Settings', icon: 'settings' },
+  { path: '/programs', title: 'Programs', icon: 'event', adminOnly: true },
   { path: '/scholarships', title: 'Financial Aid', icon: 'school', adminOnly: true },
   { path: '/students', title: 'Students', icon: 'people', adminOnly: true },
 ];
@@ -92,6 +93,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return 'Videos';
       case 'settings':
         return 'Settings';
+      case 'programs':
+        return 'Programs';
       case 'scholarships':
         return 'Financial Aid';
       case 'students':

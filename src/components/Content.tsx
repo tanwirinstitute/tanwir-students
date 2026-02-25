@@ -6,6 +6,7 @@ import { Videos } from './videos/Videos';
 import { CourseDetail } from './courses/CourseDetail';
 import { AssignmentDetail } from './assignments/AssignmentDetail';
 import { AttachmentViewer } from './courses/AttachmentViewer';
+import { Programs } from './programs/Programs';
 import { Scholarships } from './scholarships/Scholarships';
 import { Students } from './admin/Students';
 import QuizCreation from './admin/QuizCreation';
@@ -66,6 +67,18 @@ export const Content: React.FC<ContentProps> = ({ currentPage }) => {
         // Only allow admin users to access the quiz creation page
         if (userRole === 'admin') {
           return <QuizCreation courseId={quizCourseId || undefined} />;
+        } else {
+          return (
+            <div className="unauthorized-container">
+              <h2>Unauthorized Access</h2>
+              <p>You do not have permission to view this page.</p>
+            </div>
+          );
+        }
+      case 'programs':
+        // Only allow admin users to access the programs page
+        if (userRole === 'admin') {
+          return <Programs />;
         } else {
           return (
             <div className="unauthorized-container">
