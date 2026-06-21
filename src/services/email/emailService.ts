@@ -50,7 +50,7 @@ export class EmailService {
       
       // Try to call the health endpoint
       const response = await axios.get(`${this.backendUrl}/health`, {
-        timeout: 5000 // 5 second timeout
+        timeout: 60000 // 60 second timeout to allow Render cold starts
       });
       
       console.log(`✅ Backend health check response: ${response.status} ${response.statusText}`, response.data);
@@ -128,13 +128,6 @@ export class EmailService {
     console.log(`- Backend URL: ${this.backendUrl}`);
     
     try {
-      // First test the connection
-      const isConnected = await this.testBackendConnection();
-      if (!isConnected) {
-        console.error('❌ Cannot send email: Backend connection test failed');
-        throw new Error('Backend connection test failed');
-      }
-      
       // Get an available discount code for this course
       const discountCode = await this.discountCodeService.getAvailableCode(courseName, need);
       
@@ -221,13 +214,6 @@ app.use(cors({
     console.log(`- Backend URL: ${this.backendUrl}`);
     
     try {
-      // First test the connection
-      const isConnected = await this.testBackendConnection();
-      if (!isConnected) {
-        console.error('❌ Cannot send emails: Backend connection test failed');
-        throw new Error('Backend connection test failed');
-      }
-      
       // Construct the full URL
       const fullUrl = `${this.backendUrl}/send-prophetic-guidance-welcome`;
       console.log(`- Full API URL: ${fullUrl}`);
@@ -280,13 +266,6 @@ app.use(cors({
     console.log(`- Backend URL: ${this.backendUrl}`);
     
     try {
-      // First test the connection
-      const isConnected = await this.testBackendConnection();
-      if (!isConnected) {
-        console.error('❌ Cannot send emails: Backend connection test failed');
-        throw new Error('Backend connection test failed');
-      }
-      
       // Construct the full URL
       const fullUrl = `${this.backendUrl}/send-associates-program-welcome`;
       console.log(`- Full API URL: ${fullUrl}`);
