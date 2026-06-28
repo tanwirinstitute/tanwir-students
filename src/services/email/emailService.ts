@@ -18,22 +18,23 @@ export interface EmailOptions {
 export class EmailService {
   private static instance: EmailService;
   private backendUrl: string;
+  private apiKey: string;
   private discountCodeService: DiscountCodeService;
 
   private constructor() {
-    // Get the backend URL from environment variables
     const envBackendUrl = import.meta.env.VITE_TANWIR_EMAILER;
     this.backendUrl = envBackendUrl || 'http://localhost:3000';
-    
+    this.apiKey = import.meta.env.VITE_TANWIR_EMAILER_API || '';
+
     console.log('📧 EmailService initialized:');
-    console.log('- Environment variable VITE_TANWIR_EMAILER:', envBackendUrl ? `"${envBackendUrl}"` : 'not set');
     console.log('- Using backend URL:', this.backendUrl);
-    
-    // Log all available environment variables (without values for security)
-    console.log('- Available env variables:', Object.keys(import.meta.env).join(', '));
-    
-    // Initialize discount code service
+    console.log('- API key set:', this.apiKey ? 'yes' : 'no');
+
     this.discountCodeService = DiscountCodeService.getInstance();
+  }
+
+  private get authHeaders() {
+    return this.apiKey ? { 'Authorization': `Bearer ${this.apiKey}` } : {};
   }
 
   static getInstance(): EmailService {
@@ -50,7 +51,8 @@ export class EmailService {
       
       // Try to call the health endpoint
       const response = await axios.get(`${this.backendUrl}/health`, {
-        timeout: 5000 // 5 second timeout
+        timeout: 5000,
+        headers: this.authHeaders
       });
       
       console.log(`✅ Backend health check response: ${response.status} ${response.statusText}`, response.data);
@@ -166,10 +168,10 @@ export class EmailService {
       
       // Call the backend API to send the financial aid acceptance email
       console.log('- Sending POST request...');
-      const response = await axios.post(fullUrl, payload);
-      
+      const response = await axios.post(fullUrl, payload, { headers: this.authHeaders });
+
       console.log('- Response received:', response.status, response.statusText);
-      
+
       if (response.status === 200 && response.data.success) {
         console.log('✅ Financial aid email sent successfully via backend API');
         
@@ -238,11 +240,10 @@ app.use(cors({
       };
       console.log(`- Sending welcome emails to ${emails.length} recipients`);
       
-      // Call the backend API to send the welcome emails
-      const response = await axios.post(fullUrl, payload);
-      
+      const response = await axios.post(fullUrl, payload, { headers: this.authHeaders });
+
       console.log('- Response received:', response.status, response.statusText);
-      
+
       if (response.status === 200 && response.data.success) {
         console.log('✅ Welcome emails sent successfully via backend API');
         return true;
@@ -297,11 +298,10 @@ app.use(cors({
       };
       console.log(`- Sending welcome emails to ${recipients.length} recipients`);
       
-      // Call the backend API to send the welcome emails
-      const response = await axios.post(fullUrl, payload);
-      
+      const response = await axios.post(fullUrl, payload, { headers: this.authHeaders });
+
       console.log('- Response received:', response.status, response.statusText);
-      
+
       if (response.status === 200 && response.data.success) {
         console.log('✅ Associates Program welcome emails sent successfully via backend API');
         return true;
