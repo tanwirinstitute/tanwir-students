@@ -140,6 +140,12 @@ export const ScholarshipDetail: React.FC<ScholarshipDetailProps> = ({ applicatio
         <div className="detail-section">
           <h4>Application Details</h4>
           <div className="detail-grid">
+            {formatTimestamp(application.submittedAt) && (
+              <div className="detail-item">
+                <label>Submitted:</label>
+                <span>{formatTimestamp(application.submittedAt)}</span>
+              </div>
+            )}
             <div className="detail-item">
               <label>Course:</label>
               <span>{application.course}</span>

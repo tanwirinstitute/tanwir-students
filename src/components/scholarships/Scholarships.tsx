@@ -3,6 +3,20 @@ import { ScholarshipService, ScholarshipApplication } from '../../services/schol
 import { ScholarshipDetail } from './ScholarshipDetail';
 import '../../styles/scholarships.css';
 
+const toDate = (value: any): Date | null => {
+  if (!value) return null;
+  let date: Date;
+  if (typeof value?.toDate === 'function') date = value.toDate();
+  else if (typeof value === 'object' && 'seconds' in value) date = new Date(value.seconds * 1000);
+  else date = new Date(value);
+  return isNaN(date.getTime()) ? null : date;
+};
+
+const formatDate = (value: any): string => {
+  const date = toDate(value);
+  return date ? date.toLocaleDateString('en-US', { dateStyle: 'medium' }) : '—';
+};
+
 export const Scholarships: React.FC = () => {
   const [applications, setApplications] = useState<ScholarshipApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,10 +71,16 @@ export const Scholarships: React.FC = () => {
       });
   };
 
-  const filteredApplications = applications.filter(app => {
-    if (filter === 'all') return true;
-    return app.status === filter;
-  });
+  const filteredApplications = applications
+    .filter(app => {
+      if (filter === 'all') return true;
+      return app.status === filter;
+    })
+    .sort((a, b) => {
+      const aTime = toDate(a.submittedAt)?.getTime() ?? 0;
+      const bTime = toDate(b.submittedAt)?.getTime() ?? 0;
+      return bTime - aTime; // newest first
+    });
 
   if (loading) {
     return (
@@ -134,6 +154,7 @@ export const Scholarships: React.FC = () => {
                       <th>Name</th>
                       <th>Course</th>
                       <th>Need</th>
+                      <th>Submitted</th>
                       <th>Status</th>
                       <th>Actions</th>
                     </tr>
@@ -144,6 +165,7 @@ export const Scholarships: React.FC = () => {
                         <td>{app.firstName} {app.lastName}</td>
                         <td>{app.course}</td>
                         <td>{app.need}</td>
+                        <td>{formatDate(app.submittedAt)}</td>
                         <td className={`status-text ${app.status || 'pending'}`}>
                           {(app.status || 'pending').charAt(0).toUpperCase() + (app.status || 'pending').slice(1)}
                         </td>

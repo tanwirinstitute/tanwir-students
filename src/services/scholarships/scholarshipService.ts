@@ -19,6 +19,7 @@ export interface ScholarshipApplication {
   status?: 'pending' | 'approved' | 'denied';
   reviewedBy?: string;
   reviewDate?: Date;
+  submittedAt?: any; // Firestore Timestamp
   comments?: string;
   consented?: boolean;
   consentedAt?: any; // Firestore Timestamp
