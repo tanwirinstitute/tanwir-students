@@ -7,6 +7,23 @@ interface ScholarshipDetailProps {
   onClose: () => void;
 }
 
+const formatTimestamp = (value: any): string | null => {
+  if (!value) return null;
+  let date: Date;
+  if (typeof value?.toDate === 'function') {
+    date = value.toDate();
+  } else if (value && typeof value === 'object' && 'seconds' in value) {
+    date = new Date(value.seconds * 1000);
+  } else {
+    date = new Date(value);
+  }
+  if (isNaN(date.getTime())) return null;
+  return date.toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+};
+
 export const ScholarshipDetail: React.FC<ScholarshipDetailProps> = ({ application, onClose }) => {
   const [comments, setComments] = useState(application.comments || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -156,6 +173,30 @@ export const ScholarshipDetail: React.FC<ScholarshipDetailProps> = ({ applicatio
           </div>
         </div>
         
+        <div className="detail-section">
+          <h4>Zakat Consent</h4>
+          <div className="detail-grid">
+            <div className="detail-item">
+              <label>Consented to use of zakat funds for tuition:</label>
+              <span className={application.consented ? 'status-approved' : 'status-denied'}>
+                {application.consented ? 'Yes' : 'No'}
+              </span>
+            </div>
+            {application.consented && formatTimestamp(application.consentedAt) && (
+              <div className="detail-item">
+                <label>Consented on:</label>
+                <span>{formatTimestamp(application.consentedAt)}</span>
+              </div>
+            )}
+            {formatTimestamp(application.consentEmailSentAt) && (
+              <div className="detail-item">
+                <label>Consent email sent:</label>
+                <span>{formatTimestamp(application.consentEmailSentAt)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="detail-section">
           <h4>Review</h4>
           <div className="comments-section">

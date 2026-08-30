@@ -20,6 +20,9 @@ export interface ScholarshipApplication {
   reviewedBy?: string;
   reviewDate?: Date;
   comments?: string;
+  consented?: boolean;
+  consentedAt?: any; // Firestore Timestamp
+  consentEmailSentAt?: any; // Firestore Timestamp
 }
 
 export class ScholarshipService {
