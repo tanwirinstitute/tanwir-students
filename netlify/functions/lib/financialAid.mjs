@@ -14,8 +14,9 @@
 const PROGRAM_CODE_RULES = [
   { keyword: 'associate', code: 'AP' }, // Associates Program
   { keyword: 'prophetic', code: 'PG' }, // Prophetic Guidance
-  { keyword: 'taqwa', code: 'TT' }, //     Taqwa for Teens
-  { keyword: 'teen', code: 'TT' }, //      Taqwa for Teens (alt wording)
+  { keyword: 'youth', code: 'YP' }, //     Youth Program
+  { keyword: 'teen', code: 'YP' }, //      Youth Program (was "Taqwa for Teens")
+  { keyword: 'taqwa', code: 'YP' }, //     Youth Program (was "Taqwa for Teens")
   { keyword: 'advanced', code: 'AS' }, //  Advanced Studies
 ];
 
