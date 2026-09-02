@@ -82,6 +82,60 @@
   color: var(--primary-color, #4a90e2);
 }
 
+.filter-hint {
+  margin: -0.75rem 0 1.25rem;
+  color: var(--text-color-secondary, #666);
+  font-size: 0.9rem;
+}
+
+/* Missing-submitted-date backfill notice */
+.backfill-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--warning-color, #f0c36d);
+  background-color: var(--warning-color, #fff8e1);
+  color: #f57f17;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.backfill-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.backfill-actions input[type='date'] {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.backfill-actions button {
+  padding: 0.45rem 0.9rem;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--primary-color, #4a90e2);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.backfill-actions button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.backfill-message {
+  flex-basis: 100%;
+  color: var(--text-color-secondary, #555);
+}
+
 /* Applications List */
 .applications-list {
   width: 100%;

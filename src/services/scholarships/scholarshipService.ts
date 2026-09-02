@@ -144,6 +144,21 @@ export class ScholarshipService {
     }
   }
 
+  /**
+   * Backfill (or correct) the submission date on an application. Used by the
+   * admin utility for records that came in without a `submittedAt` and would
+   * otherwise never show up under the "Active" filter.
+   */
+  async setSubmittedDate(id: string, date: Date): Promise<void> {
+    try {
+      const docRef = doc(this.db, 'scholarships', id);
+      await updateDoc(docRef, { submittedAt: date });
+    } catch (error) {
+      console.error(`Error setting submitted date for application ${id}:`, error);
+      throw error;
+    }
+  }
+
   async deleteApplication(id: string): Promise<void> {
     try {
       const docRef = doc(this.db, 'scholarships', id);

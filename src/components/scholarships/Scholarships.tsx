@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ScholarshipService, ScholarshipApplication } from '../../services/scholarships/scholarshipService';
 import { ScholarshipDetail } from './ScholarshipDetail';
 import '../../styles/scholarships.css';
@@ -17,27 +17,54 @@ const formatDate = (value: any): string => {
   return date ? date.toLocaleDateString('en-US', { dateStyle: 'medium' }) : '—';
 };
 
+// An application is "active" while it still needs a decision: pending, and
+// submitted within the last 2 months. Older pending applications are stale and
+// drop out of the Active view.
+const ACTIVE_WINDOW_MONTHS = 2;
+
+const submittedWithinActiveWindow = (value: any): boolean => {
+  const date = toDate(value);
+  if (!date) return false;
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - ACTIVE_WINDOW_MONTHS);
+  return date.getTime() >= cutoff.getTime();
+};
+
+const isActive = (app: ScholarshipApplication): boolean =>
+  (app.status || 'pending') === 'pending' && submittedWithinActiveWindow(app.submittedAt);
+
+type Filter = 'active' | 'all' | 'pending' | 'approved' | 'denied';
+
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: 'active', label: 'Active' },
+  { key: 'all', label: 'All' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'denied', label: 'Denied' },
+];
+
 export const Scholarships: React.FC = () => {
   const [applications, setApplications] = useState<ScholarshipApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedApplication, setSelectedApplication] = useState<ScholarshipApplication | null>(null);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'denied'>('all');
+  const [filter, setFilter] = useState<Filter>('active');
+
+  const [backfillDate, setBackfillDate] = useState('2026-09-01');
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillMessage, setBackfillMessage] = useState<string | null>(null);
+
+  const loadApplications = async () => {
+    const scholarshipService = ScholarshipService.getInstance();
+    const data = await scholarshipService.getAllApplications();
+    setApplications(data.map(app => ({ ...app, status: app.status || 'pending' })));
+  };
 
   useEffect(() => {
-    const fetchApplications = async () => {
+    (async () => {
       try {
         setLoading(true);
-        const scholarshipService = ScholarshipService.getInstance();
-        const data = await scholarshipService.getAllApplications();
-        
-        // Set default status to 'pending' if not specified
-        const processedData = data.map(app => ({
-          ...app,
-          status: app.status || 'pending'
-        }));
-        
-        setApplications(processedData);
+        await loadApplications();
         setError(null);
       } catch (err) {
         console.error('Error fetching scholarship applications:', err);
@@ -45,9 +72,7 @@ export const Scholarships: React.FC = () => {
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchApplications();
+    })();
   }, []);
 
   const handleSelectApplication = (application: ScholarshipApplication) => {
@@ -56,25 +81,48 @@ export const Scholarships: React.FC = () => {
 
   const handleCloseDetail = () => {
     setSelectedApplication(null);
-    // Refresh the list after closing detail view
-    const scholarshipService = ScholarshipService.getInstance();
-    scholarshipService.getAllApplications()
-      .then(data => {
-        const processedData = data.map(app => ({
-          ...app,
-          status: app.status || 'pending'
-        }));
-        setApplications(processedData);
-      })
-      .catch(err => {
-        console.error('Error refreshing scholarship applications:', err);
-      });
+    loadApplications().catch(err => {
+      console.error('Error refreshing scholarship applications:', err);
+    });
+  };
+
+  // Pending records with no parseable submittedAt are invisible under the Active
+  // filter, so surface them for a one-click fix.
+  const undatedApplications = useMemo(
+    () => applications.filter(app => (app.status || 'pending') === 'pending' && !toDate(app.submittedAt)),
+    [applications],
+  );
+
+  const handleBackfillDates = async () => {
+    const parsed = toDate(`${backfillDate}T12:00:00`);
+    if (!parsed) {
+      setBackfillMessage('Enter a valid date first.');
+      return;
+    }
+
+    setBackfilling(true);
+    setBackfillMessage(null);
+    try {
+      const scholarshipService = ScholarshipService.getInstance();
+      const targets = undatedApplications.filter(app => app.id);
+      await Promise.all(targets.map(app => scholarshipService.setSubmittedDate(app.id!, parsed)));
+      await loadApplications();
+      setBackfillMessage(
+        `Set submitted date to ${parsed.toLocaleDateString('en-US', { dateStyle: 'medium' })} for ${targets.length} application(s).`,
+      );
+    } catch (err) {
+      console.error('Error backfilling submitted dates:', err);
+      setBackfillMessage('Failed to update some applications. Please try again.');
+    } finally {
+      setBackfilling(false);
+    }
   };
 
   const filteredApplications = applications
     .filter(app => {
       if (filter === 'all') return true;
-      return app.status === filter;
+      if (filter === 'active') return isActive(app);
+      return (app.status || 'pending') === filter;
     })
     .sort((a, b) => {
       const aTime = toDate(a.submittedAt)?.getTime() ?? 0;
@@ -103,43 +151,55 @@ export const Scholarships: React.FC = () => {
   return (
     <div className="scholarships-container">
       <h2>Financial Aid Applications</h2>
-      
+
       {selectedApplication ? (
-        <ScholarshipDetail 
-          application={selectedApplication} 
-          onClose={handleCloseDetail} 
+        <ScholarshipDetail
+          application={selectedApplication}
+          onClose={handleCloseDetail}
         />
       ) : (
         <>
           <div className="filter-controls">
             <span>Filter by status:</span>
             <div className="filter-buttons">
-              <button 
-                className={filter === 'all' ? 'active' : ''} 
-                onClick={() => setFilter('all')}
-              >
-                All
-              </button>
-              <button 
-                className={filter === 'pending' ? 'active' : ''} 
-                onClick={() => setFilter('pending')}
-              >
-                Pending
-              </button>
-              <button 
-                className={filter === 'approved' ? 'active' : ''} 
-                onClick={() => setFilter('approved')}
-              >
-                Approved
-              </button>
-              <button 
-                className={filter === 'denied' ? 'active' : ''} 
-                onClick={() => setFilter('denied')}
-              >
-                Denied
-              </button>
+              {FILTERS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  className={filter === key ? 'active' : ''}
+                  onClick={() => setFilter(key)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
+
+          {filter === 'active' && (
+            <p className="filter-hint">
+              Pending applications submitted in the last {ACTIVE_WINDOW_MONTHS} months.
+            </p>
+          )}
+
+          {undatedApplications.length > 0 && (
+            <div className="backfill-notice">
+              <span>
+                {undatedApplications.length} application(s) have no submitted date and won't appear under{' '}
+                <strong>Active</strong>.
+              </span>
+              <span className="backfill-actions">
+                <input
+                  type="date"
+                  value={backfillDate}
+                  onChange={e => setBackfillDate(e.target.value)}
+                  disabled={backfilling}
+                />
+                <button onClick={handleBackfillDates} disabled={backfilling}>
+                  {backfilling ? 'Updating…' : `Set submitted date for ${undatedApplications.length}`}
+                </button>
+              </span>
+              {backfillMessage && <span className="backfill-message">{backfillMessage}</span>}
+            </div>
+          )}
 
           {filteredApplications.length === 0 ? (
             <div className="no-applications">
@@ -170,7 +230,7 @@ export const Scholarships: React.FC = () => {
                           {(app.status || 'pending').charAt(0).toUpperCase() + (app.status || 'pending').slice(1)}
                         </td>
                         <td>
-                          <button 
+                          <button
                             className="view-button"
                             onClick={() => handleSelectApplication(app)}
                           >
