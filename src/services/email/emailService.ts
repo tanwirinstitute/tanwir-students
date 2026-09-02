@@ -1,9 +1,32 @@
 import axios from 'axios';
-import { DiscountCodeService } from '../discounts/discountCodeService';
 
 export interface EmailRecipient {
   email: string;
   name?: string;
+}
+
+const VALID_DISCOUNTS = [25, 50, 75, 100];
+
+/**
+ * Resolve an application's `need` value to a discount percentage the approval
+ * relay accepts (25 / 50 / 75 / 100). Handles a direct percentage ("75%") as
+ * well as the older free-text levels ("moderate", "significant", ...).
+ */
+function needToDiscountPercentage(need: string | undefined): number {
+  if (!need) return 25;
+
+  const needLower = need.toLowerCase();
+
+  const percentageMatch = needLower.match(/(\d+)\s*%/);
+  if (percentageMatch) {
+    const percentage = parseInt(percentageMatch[1], 10);
+    if (VALID_DISCOUNTS.includes(percentage)) return percentage;
+  }
+
+  if (/(extreme|severe|high|full)/.test(needLower)) return 100;
+  if (/(significant|major|substantial)/.test(needLower)) return 75;
+  if (/(moderate|partial|some)/.test(needLower)) return 50;
+  return 25;
 }
 
 export interface EmailOptions {
@@ -19,7 +42,6 @@ export class EmailService {
   private static instance: EmailService;
   private backendUrl: string;
   private apiKey: string;
-  private discountCodeService: DiscountCodeService;
 
   private constructor() {
     const envBackendUrl = import.meta.env.VITE_TANWIR_EMAILER;
@@ -29,8 +51,6 @@ export class EmailService {
     console.log('📧 EmailService initialized:');
     console.log('- Using backend URL:', this.backendUrl);
     console.log('- API key set:', this.apiKey ? 'yes' : 'no');
-
-    this.discountCodeService = DiscountCodeService.getInstance();
   }
 
   private get authHeaders() {
@@ -111,8 +131,15 @@ export class EmailService {
   }
 
   /**
-   * Send a scholarship decision email
-   * @throws Error with a user-friendly message if no discount codes are available
+   * Approve a scholarship application: create a discount code and email it to
+   * the applicant.
+   *
+   * The browser must never hold the discount / emailer secrets, so this posts
+   * to the same-origin relay (`/api/approve-financial-aid` — the Netlify
+   * function in prod, the vite dev middleware locally) which creates the code
+   * in real time and forwards it to the emailer.
+   *
+   * @throws Error with a user-facing message if the approval could not be completed.
    */
   async sendScholarshipDecisionEmail(
     recipient: EmailRecipient,
@@ -125,90 +152,37 @@ export class EmailService {
       console.log('📧 Denial emails are not currently implemented in the backend API');
       return false;
     }
-    
-    console.log(`📧 Preparing approval email for ${recipient.email} via backend API`);
-    console.log(`- Backend URL: ${this.backendUrl}`);
-    
+
+    const discountPercentage = needToDiscountPercentage(need);
+    console.log(
+      `📧 Approving financial aid for ${recipient.email} — ${courseName} @ ${discountPercentage}% (need: "${need ?? ''}")`
+    );
+
     try {
-      // First test the connection
-      const isConnected = await this.testBackendConnection();
-      if (!isConnected) {
-        console.error('❌ Cannot send email: Backend connection test failed');
-        throw new Error('Backend connection test failed');
-      }
-      
-      // Get an available discount code for this course
-      const discountCode = await this.discountCodeService.getAvailableCode(courseName, need);
-      
-      if (!discountCode) {
-        const errorMessage = 'No available discount codes found for this course. Please request more discount codes before approving additional applications.';
-        console.error(`❌ ${errorMessage}`);
-        throw new Error(errorMessage);
-      }
-      
-      console.log(`✅ Found available discount code: ${discountCode.code} (${discountCode.discount})`);
-      
-      // Extract discount percentage from the string (e.g., "100%" -> 100)
-      const discountPercentage = parseInt(discountCode.discount.replace('%', ''));
-      
-      // Construct the full URL
-      const fullUrl = `${this.backendUrl}/send-financial-aid-email`;
-      console.log(`- Full API URL: ${fullUrl}`);
-      
-      // Prepare payload with the new fields
-      const payload = {
+      const response = await axios.post('/api/approve-financial-aid', {
+        course: courseName,
+        discountPercentage,
         recipientEmail: recipient.email,
         studentName: recipient.name || 'Student',
-        discountPercentage: discountPercentage,
-        discountCode: discountCode.code,
-        programName: courseName,
-        additionalDetails: comments || `This scholarship is for the ${courseName} course.`
-      };
-      console.log('- Payload:', JSON.stringify(payload));
-      
-      // Call the backend API to send the financial aid acceptance email
-      console.log('- Sending POST request...');
-      const response = await axios.post(fullUrl, payload, { headers: this.authHeaders });
+        comments: comments || undefined,
+      });
 
-      console.log('- Response received:', response.status, response.statusText);
-
-      if (response.status === 200 && response.data.success) {
-        console.log('✅ Financial aid email sent successfully via backend API');
-        
-        // Mark the discount code as used
-        if (discountCode.id) {
-          await this.discountCodeService.markCodeAsUsed(discountCode.id, recipient.email);
-        }
-        
+      if (response.data?.success) {
+        console.log(
+          `✅ Financial aid approved — discount code ${response.data.code} emailed to ${recipient.email}`
+        );
         return true;
-      } else {
-        console.error('❌ Backend API returned an error:', response.data);
-        return false;
       }
+
+      throw new Error(response.data?.message || 'Financial aid approval failed.');
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        console.error('❌ Axios error calling backend API:', {
-          message: error.message,
-          response: error.response?.data || 'No response data',
-          status: error.response?.status || 'No status code'
-        });
-        
-        // Check for CORS issues
-        if (error.message.includes('Network Error') || !error.response) {
-          console.error('⚠️ This might be a CORS issue. Make sure your backend has CORS enabled for your frontend origin.');
-          console.error('⚠️ Try adding this to your Express app:');
-          console.error(`
-const cors = require('cors');
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] // Add your frontend URL
-}));
-          `);
-        }
-      } else {
-        console.error('❌ Error calling backend API:', error);
+        const message =
+          (error.response?.data as { message?: string } | undefined)?.message || error.message;
+        console.error('❌ Financial aid approval failed:', message);
+        throw new Error(message);
       }
-      
-      // Re-throw the error to be handled by the caller
+      console.error('❌ Financial aid approval failed:', error);
       throw error;
     }
   }
