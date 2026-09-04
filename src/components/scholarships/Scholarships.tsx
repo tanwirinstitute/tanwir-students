@@ -1,16 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScholarshipService, ScholarshipApplication } from '../../services/scholarships/scholarshipService';
+import {
+  ScholarshipService,
+  ScholarshipApplication,
+  parseAppDate as toDate,
+} from '../../services/scholarships/scholarshipService';
 import { ScholarshipDetail } from './ScholarshipDetail';
 import '../../styles/scholarships.css';
-
-const toDate = (value: any): Date | null => {
-  if (!value) return null;
-  let date: Date;
-  if (typeof value?.toDate === 'function') date = value.toDate();
-  else if (typeof value === 'object' && 'seconds' in value) date = new Date(value.seconds * 1000);
-  else date = new Date(value);
-  return isNaN(date.getTime()) ? null : date;
-};
 
 const formatDate = (value: any): string => {
   const date = toDate(value);

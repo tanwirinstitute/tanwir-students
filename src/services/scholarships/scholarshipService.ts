@@ -19,12 +19,56 @@ export interface ScholarshipApplication {
   status?: 'pending' | 'approved' | 'denied';
   reviewedBy?: string;
   reviewDate?: Date;
-  submittedAt?: any; // Firestore Timestamp
+  submittedAt?: any; // Firestore Timestamp, or a "MM/DD/YY hh:mmAM" string
   comments?: string;
-  consented?: boolean;
+  consented?: boolean | string; // legacy boolean, or "Yes" / "No" string
   consentedAt?: any; // Firestore Timestamp
   consentEmailSentAt?: any; // Firestore Timestamp
 }
+
+// Newer scholarship records store the submission time as a string like
+// "09/03/26 07:01PM" instead of a Firestore Timestamp. `new Date(...)` on that
+// string is unreliable across browsers, so parse it explicitly.
+const DATE_STRING_RE = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})\s+(\d{1,2}):(\d{2})\s*([AP]M)$/i;
+
+/**
+ * Coerce any of the shapes a scholarship date field can take — Firestore
+ * Timestamp, `{ seconds }`, ISO string, "MM/DD/YY hh:mmAM" string, or Date — to
+ * a Date, or null if it can't be parsed.
+ */
+export const parseAppDate = (value: any): Date | null => {
+  if (!value) return null;
+
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value;
+  if (typeof value?.toDate === 'function') {
+    const d = value.toDate();
+    return isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof value === 'object' && 'seconds' in value) {
+    const d = new Date(value.seconds * 1000);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  if (typeof value === 'string') {
+    const match = value.trim().match(DATE_STRING_RE);
+    if (match) {
+      const [, mm, dd, yy, hh, min, ampm] = match;
+      let year = parseInt(yy, 10);
+      if (year < 100) year += 2000;
+      let hours = parseInt(hh, 10) % 12;
+      if (/pm/i.test(ampm)) hours += 12;
+      const d = new Date(year, parseInt(mm, 10) - 1, parseInt(dd, 10), hours, parseInt(min, 10));
+      return isNaN(d.getTime()) ? null : d;
+    }
+  }
+
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+/** True for boolean `true` or a "yes" string (any casing). */
+export const isYes = (value: boolean | string | undefined | null): boolean =>
+  value === true || (typeof value === 'string' && value.trim().toLowerCase() === 'yes');
 
 export class ScholarshipService {
   private static instance: ScholarshipService;

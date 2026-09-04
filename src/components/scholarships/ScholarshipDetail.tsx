@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import { ScholarshipApplication, ScholarshipService } from '../../services/scholarships/scholarshipService';
+import {
+  ScholarshipApplication,
+  ScholarshipService,
+  parseAppDate,
+  isYes,
+} from '../../services/scholarships/scholarshipService';
 import { AuthService } from '../../services/auth';
 
 interface ScholarshipDetailProps {
@@ -8,16 +13,8 @@ interface ScholarshipDetailProps {
 }
 
 const formatTimestamp = (value: any): string | null => {
-  if (!value) return null;
-  let date: Date;
-  if (typeof value?.toDate === 'function') {
-    date = value.toDate();
-  } else if (value && typeof value === 'object' && 'seconds' in value) {
-    date = new Date(value.seconds * 1000);
-  } else {
-    date = new Date(value);
-  }
-  if (isNaN(date.getTime())) return null;
+  const date = parseAppDate(value);
+  if (!date) return null;
   return date.toLocaleString('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -184,11 +181,11 @@ export const ScholarshipDetail: React.FC<ScholarshipDetailProps> = ({ applicatio
           <div className="detail-grid">
             <div className="detail-item">
               <label>Consented to use of zakat funds for tuition:</label>
-              <span className={application.consented ? 'status-approved' : 'status-denied'}>
-                {application.consented ? 'Yes' : 'No'}
+              <span className={isYes(application.consented) ? 'status-approved' : 'status-denied'}>
+                {isYes(application.consented) ? 'Yes' : 'No'}
               </span>
             </div>
-            {application.consented && formatTimestamp(application.consentedAt) && (
+            {isYes(application.consented) && formatTimestamp(application.consentedAt) && (
               <div className="detail-item">
                 <label>Consented on:</label>
                 <span>{formatTimestamp(application.consentedAt)}</span>
